@@ -24,6 +24,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c4d91265-23b2-447c-8ec5-dfdc77e35c2b"
+      }
+    },
+    "owner": "marcosmartilotta.dev"
   }
 }
