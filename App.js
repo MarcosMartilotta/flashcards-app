@@ -1,105 +1,222 @@
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
-import { useEffect, useState } from "react";
-import { getCards, addCard, updateCard } from "./services/service";
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { getCards, addCard, updateCard, toggleArchiveCard, batchUpdateArchive } from "./services/service";
 import FlashCard from "./components/FlashCard";
 import CardModal from "./components/CardModal";
+import RegistrationFlow from "./components/RegistrationFlow";
+import Sidebar from "./components/Sidebar";
+import CardList from "./components/CardList";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userName, setUserName] = useState("");
   const [cards, setCards] = useState([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+
+  // App State
+  const [view, setView] = useState("flashcards"); // "flashcards" or "list"
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const hasPendingChanges = useRef(false);
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false); // false = crear, true = editar
-  const [editingCardId, setEditingCardId] = useState(null);
+  const [editingCard, setEditingCard] = useState(null);
 
-  // -------------------------------------------------------
-  // 1) Cargar tarjetas desde Backend Propio
-  // -------------------------------------------------------
   useEffect(() => {
-    loadCards();
+    checkAuth();
   }, []);
+
+  async function checkAuth() {
+    const token = await AsyncStorage.getItem("userToken");
+    const name = await AsyncStorage.getItem("userName");
+    if (token) {
+      setIsAuthenticated(true);
+      setUserName(name || "");
+      loadCards();
+    }
+    setAuthChecked(true);
+  }
 
   async function loadCards() {
     const data = await getCards();
     if (data.length > 0) {
       setCards(data);
-      setCurrentCardIndex(Math.floor(Math.random() * data.length));
+      const activeIndices = data.map((c, i) => (c.is_active === 1 ? i : -1)).filter(i => i !== -1);
+
+      // If current card is missing or inactive, find a new active one
+      if (activeIndices.length > 0) {
+        const currentIsActive = data[currentCardIndex]?.is_active === 1;
+        if (!currentIsActive) {
+          const randomActive = activeIndices[Math.floor(Math.random() * activeIndices.length)];
+          setCurrentCardIndex(randomActive);
+        }
+      }
+    } else {
+      setCards([]);
     }
   }
 
-  // -------------------------------------------------------
-  // Nueva tarjeta aleatoria
-  // -------------------------------------------------------
   const handleNextCard = () => {
-    if (cards.length <= 1) return;
+    const activeIndices = cards.map((c, i) => (c.is_active === 1 ? i : -1)).filter(i => i !== -1);
+    if (activeIndices.length <= 1) return;
 
-    let newIndex;
+    let nextIdx;
     do {
-      newIndex = Math.floor(Math.random() * cards.length);
-    } while (newIndex === currentCardIndex);
+      nextIdx = activeIndices[Math.floor(Math.random() * activeIndices.length)];
+    } while (nextIdx === currentCardIndex);
 
-    setCurrentCardIndex(newIndex);
+    setCurrentCardIndex(nextIdx);
   };
 
-  if (cards.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text>Cargando tarjetas...</Text>
-      </View>
-    );
-  }
-
-  const currentCard = cards[currentCardIndex];
-
-  // -------------------------------------------------------
-  // Abrir modal para insertar NUEVA card
-  // -------------------------------------------------------
   const openInsertModal = () => {
     setEditMode(false);
-    setEditingCardId(null);
+    setEditingCard(null);
     setModalVisible(true);
   };
 
-  // -------------------------------------------------------
-  // Abrir modal para EDITAR card (long press 2s)
-  // -------------------------------------------------------
-  const openEditModal = () => {
+  const openEditModal = (cardOverride = null) => {
+    const targetCard = cardOverride || cards[currentCardIndex];
     setEditMode(true);
-    setEditingCardId(currentCard.id);
+    setEditingCard(targetCard);
     setModalVisible(true);
   };
 
-  // -------------------------------------------------------
-  // Guardar en Backend (insert o update)
-  // -------------------------------------------------------
   const handleSave = async (pregunta, respuesta) => {
-    if (editMode) {
-      await updateCard(editingCardId, pregunta, respuesta);
+    if (editMode && editingCard) {
+      await updateCard(editingCard.id, pregunta, respuesta);
     } else {
       await addCard(pregunta, respuesta);
     }
-
     setModalVisible(false);
     await loadCards();
   };
 
+  const handleArchiveToggle = async (cardId, isActive) => {
+    // Immediate API call for study view swipe
+    await toggleArchiveCard(cardId, isActive);
+    await loadCards();
+  };
+
+  const handleLocalToggle = (cardId, isActive) => {
+    // Local update for the list view
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, is_active: isActive ? 1 : 0 } : c));
+    hasPendingChanges.current = true;
+  };
+
+  const syncPendingChanges = async () => {
+    if (hasPendingChanges.current) {
+      try {
+        const updates = cards.map(c => ({ card_id: c.id, is_active: c.is_active }));
+        await batchUpdateArchive(updates);
+        hasPendingChanges.current = false;
+      } catch (e) {
+        console.error("Sync failed:", e);
+        alert("No se pudo sincronizar el estado. Reintenta al salir de la lista.");
+      }
+      await loadCards();
+    }
+  };
+
+  const changeView = async (newView) => {
+    if (view === "list" && newView !== "list") {
+      await syncPendingChanges();
+    }
+    setView(newView);
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem("userToken");
+    await AsyncStorage.removeItem("userName");
+    setIsAuthenticated(false);
+    setSidebarOpen(false);
+    setCards([]);
+    setView("flashcards");
+  };
+
+  if (!authChecked) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <RegistrationFlow onComplete={() => {
+      checkAuth();
+    }} />;
+  }
+
+  const activeCards = cards.filter(c => c.is_active === 1);
+  const currentCard = cards[currentCardIndex];
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Flashcards para aprender Inglés</Text>
+      <SafeAreaView style={styles.mainArea}>
+        <StatusBar style="dark" />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.menuButton} onPress={() => setSidebarOpen(true)}>
+            <Text style={styles.menuIcon}>☰</Text>
+          </TouchableOpacity>
 
-      <FlashCard card={currentCard} onLongPress={openEditModal} onEdit={openEditModal} />
+          <Text style={styles.headerTitle}>{view === "flashcards" ? "Flashcards AI" : "Mis Tarjetas"}</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
-      <View style={styles.buttonsRow}>
-        <TouchableOpacity style={styles.insertButton} onPress={openInsertModal}>
-          <Text style={styles.insertButtonText}>Insertar nueva</Text>
-        </TouchableOpacity>
+        <View style={styles.content}>
+          {view === "flashcards" ? (
+            <>
+              {activeCards.length > 0 && currentCard ? (
+                <>
+                  <Text style={styles.subtitle}>Aprende inglés de forma inteligente</Text>
+                  <FlashCard
+                    card={currentCard}
+                    onLongPress={() => openEditModal()}
+                    onEdit={() => openEditModal()}
+                    onArchive={() => handleArchiveToggle(currentCard.id, false)}
+                  />
+                  <View style={styles.buttonsRow}>
+                    <TouchableOpacity style={styles.insertButton} onPress={openInsertModal}>
+                      <Text style={styles.insertButtonText}>+ Agregar</Text>
+                    </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={handleNextCard}>
-          <Text style={styles.buttonText}>Siguiente</Text>
-        </TouchableOpacity>
-      </View>
+                    <TouchableOpacity style={styles.button} onPress={handleNextCard}>
+                      <Text style={styles.buttonText}>Siguiente</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.emptyPrompt}>
+                  <Text style={styles.emptyText}>No tienes tarjetas activas.</Text>
+                  <TouchableOpacity style={styles.primaryButton} onPress={openInsertModal}>
+                    <Text style={styles.buttonText}>Crear una nueva</Text>
+                  </TouchableOpacity>
+                  {cards.length > activeCards.length && (
+                    <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setView("list")}>
+                      <Text style={{ color: "#3b82f6", textDecorationLine: "underline" }}>Ver tarjetas aprendidas</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </>
+          ) : (
+            <CardList cards={cards} onEdit={(card) => openEditModal(card)} onToggleLocal={handleLocalToggle} />
+          )}
+        </View>
+      </SafeAreaView>
+
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onLogout={handleLogout}
+        onNavigate={changeView}
+        userName={userName}
+      />
 
       <CardModal
         visible={modalVisible}
@@ -107,44 +224,74 @@ export default function App() {
         onSave={handleSave}
         isEditing={editMode}
         initialData={
-          editMode
-            ? { pregunta: currentCard.pregunta, respuesta: currentCard.respuesta }
+          editMode && editingCard
+            ? { pregunta: editingCard.pregunta, respuesta: editingCard.respuesta }
             : null
         }
       />
-
-      <StatusBar style="auto" />
     </View>
   );
 }
 
-// -------------------------------------------------------
-// STYLES
-// -------------------------------------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f4f8",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
+    backgroundColor: "#f8fafc",
   },
-  title: {
-    fontSize: 24,
+  mainArea: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 40 : 10,
+    paddingBottom: 20,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuIcon: {
+    fontSize: 28,
+    color: "#1e293b",
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 40,
-    color: "#333",
+    color: "#1e293b",
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#64748b",
+    marginBottom: 30,
+    textAlign: "center",
   },
   buttonsRow: {
     flexDirection: "row",
     marginTop: 40,
-    gap: 10,
+    gap: 15,
   },
   insertButton: {
     backgroundColor: "#10b981",
     paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingHorizontal: 25,
+    borderRadius: 30,
+    elevation: 3,
   },
   insertButtonText: {
     color: "#fff",
@@ -155,11 +302,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#3b82f6",
     paddingVertical: 15,
     paddingHorizontal: 40,
-    borderRadius: 25,
+    borderRadius: 30,
+    elevation: 3,
   },
   buttonText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
   },
+  emptyPrompt: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 18,
+    color: "#64748b",
+    marginBottom: 20,
+  },
+  primaryButton: {
+    backgroundColor: "#3b82f6",
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+  }
 });

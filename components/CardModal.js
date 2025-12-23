@@ -26,7 +26,11 @@ export default function CardModal({
     }, [visible, initialData]);
 
     const handleSave = () => {
-        onSave(pregunta, respuesta);
+        if (!pregunta.trim() || !respuesta.trim()) {
+            alert("Por favor, completa ambos campos.");
+            return;
+        }
+        onSave(pregunta.trim(), respuesta.trim());
     };
 
     return (
