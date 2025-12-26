@@ -1,24 +1,31 @@
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Dimensions } from "react-native";
 import { useEffect, useState, useRef } from "react";
-import { getCards, addCard, updateCard, toggleArchiveCard, batchUpdateArchive } from "./services/service";
+import { getCards, addCard, updateCard, toggleArchiveCard, batchUpdateArchive, getTeacherClasses } from "./services/service";
 import FlashCard from "./components/FlashCard";
 import CardModal from "./components/CardModal";
 import RegistrationFlow from "./components/RegistrationFlow";
 import Sidebar from "./components/Sidebar";
 import CardList from "./components/CardList";
+import ClassesView from "./components/ClassesView";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { lightTheme, darkTheme } from "./theme";
 
+const { width } = Dimensions.get("window");
 
 export default function App() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const theme = isDarkMode ? darkTheme : lightTheme;
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [userName, setUserName] = useState("");
+  const [user, setUser] = useState(null);
   const [cards, setCards] = useState([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [teacherClasses, setTeacherClasses] = useState([]);
 
   // App State
-  const [view, setView] = useState("flashcards"); // "flashcards" or "list"
+  const [view, setView] = useState("flashcards"); // "flashcards", "list", "classes"
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hasPendingChanges = useRef(false);
 
@@ -28,18 +35,39 @@ export default function App() {
   const [editingCard, setEditingCard] = useState(null);
 
   useEffect(() => {
+    loadTheme();
     checkAuth();
   }, []);
 
+  async function loadTheme() {
+    const saved = await AsyncStorage.getItem("themeMode");
+    if (saved) setIsDarkMode(saved === "dark");
+  }
+
+  const toggleTheme = async () => {
+    const newVal = !isDarkMode;
+    setIsDarkMode(newVal);
+    await AsyncStorage.setItem("themeMode", newVal ? "dark" : "light");
+  };
+
   async function checkAuth() {
     const token = await AsyncStorage.getItem("userToken");
-    const name = await AsyncStorage.getItem("userName");
-    if (token) {
+    const userDataStr = await AsyncStorage.getItem("userData");
+    if (token && userDataStr) {
+      const userData = JSON.parse(userDataStr);
       setIsAuthenticated(true);
-      setUserName(name || "");
-      loadCards();
+      setUser(userData);
+      loadInitialData(userData);
     }
     setAuthChecked(true);
+  }
+
+  async function loadInitialData(userData) {
+    loadCards();
+    if (userData?.role === 'teacher') {
+      const classes = await getTeacherClasses();
+      setTeacherClasses(classes);
+    }
   }
 
   async function loadCards() {
@@ -86,24 +114,22 @@ export default function App() {
     setModalVisible(true);
   };
 
-  const handleSave = async (pregunta, respuesta) => {
+  const handleSave = async (pregunta, respuesta, selectedClase = null) => {
     if (editMode && editingCard) {
       await updateCard(editingCard.id, pregunta, respuesta);
     } else {
-      await addCard(pregunta, respuesta);
+      await addCard(pregunta, respuesta, selectedClase);
     }
     setModalVisible(false);
     await loadCards();
   };
 
   const handleArchiveToggle = async (cardId, isActive) => {
-    // Immediate API call for study view swipe
     await toggleArchiveCard(cardId, isActive);
     await loadCards();
   };
 
   const handleLocalToggle = (cardId, isActive) => {
-    // Local update for the list view
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, is_active: isActive ? 1 : 0 } : c));
     hasPendingChanges.current = true;
   };
@@ -127,12 +153,18 @@ export default function App() {
       await syncPendingChanges();
     }
     setView(newView);
+    if (newView === "classes") {
+      const classes = await getTeacherClasses();
+      setTeacherClasses(classes);
+    }
   };
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem("userToken");
     await AsyncStorage.removeItem("userName");
+    await AsyncStorage.removeItem("userData");
     setIsAuthenticated(false);
+    setUser(null);
     setSidebarOpen(false);
     setCards([]);
     setView("flashcards");
@@ -140,72 +172,111 @@ export default function App() {
 
   if (!authChecked) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
 
   if (!isAuthenticated) {
-    return <RegistrationFlow onComplete={() => {
-      checkAuth();
-    }} />;
+    return <RegistrationFlow onComplete={() => checkAuth()} isDarkMode={isDarkMode} />;
   }
 
   const activeCards = cards.filter(c => c.is_active === 1);
   const currentCard = cards[currentCardIndex];
+  const pageTitle = view === "flashcards" ? "Estudiar" : (view === "list" ? "Mis Tarjetas" : "Mis Clases");
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.mainArea}>
-        <StatusBar style="dark" />
+        <StatusBar style={isDarkMode ? "light" : "dark"} />
+
+        {/* Modern Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.menuButton} onPress={() => setSidebarOpen(true)}>
-            <Text style={styles.menuIcon}>☰</Text>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setSidebarOpen(true)}>
+            <Text style={[styles.iconText, { color: theme.text }]}>☰</Text>
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>{view === "flashcards" ? "Flashcards AI" : "Mis Tarjetas"}</Text>
-          <View style={{ width: 40 }} />
+          <View style={styles.titleContainer}>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>{pageTitle}</Text>
+            {view === 'flashcards' && activeCards.length > 0 && (
+              <Text style={[styles.activeCount, { color: theme.textSecondary }]}>
+                {activeCards.length} activas
+              </Text>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.iconButton} onPress={toggleTheme}>
+            <Text style={[styles.iconText, { color: theme.text }]}>{isDarkMode ? "☀️" : "🌙"}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
-          {view === "flashcards" ? (
+          {view === "flashcards" && (
             <>
               {activeCards.length > 0 && currentCard ? (
-                <>
-                  <Text style={styles.subtitle}>Aprende inglés de forma inteligente</Text>
+                <View style={styles.flashcardContainer}>
                   <FlashCard
                     card={currentCard}
                     onLongPress={() => openEditModal()}
                     onEdit={() => openEditModal()}
                     onArchive={() => handleArchiveToggle(currentCard.id, false)}
+                    theme={theme}
                   />
-                  <View style={styles.buttonsRow}>
-                    <TouchableOpacity style={styles.insertButton} onPress={openInsertModal}>
-                      <Text style={styles.insertButtonText}>+ Agregar</Text>
+
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[styles.glassButton, { backgroundColor: theme.primary }]}
+                      onPress={handleNextCard}
+                    >
+                      <Text style={styles.mainBtnText}>Siguiente →</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.button} onPress={handleNextCard}>
-                      <Text style={styles.buttonText}>Siguiente</Text>
+                    <TouchableOpacity
+                      style={[styles.glassButton, { backgroundColor: theme.secondary }]}
+                      onPress={openInsertModal}
+                    >
+                      <Text style={styles.mainBtnText}>+ Crear</Text>
                     </TouchableOpacity>
                   </View>
-                </>
+                </View>
               ) : (
                 <View style={styles.emptyPrompt}>
-                  <Text style={styles.emptyText}>No tienes tarjetas activas.</Text>
-                  <TouchableOpacity style={styles.primaryButton} onPress={openInsertModal}>
-                    <Text style={styles.buttonText}>Crear una nueva</Text>
+                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No tienes tarjetas para estudiar.</Text>
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+                    onPress={openInsertModal}
+                  >
+                    <Text style={styles.mainBtnText}>Crear mi primera tarjeta</Text>
                   </TouchableOpacity>
-                  {cards.length > activeCards.length && (
-                    <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setView("list")}>
-                      <Text style={{ color: "#3b82f6", textDecorationLine: "underline" }}>Ver tarjetas aprendidas</Text>
+                  {cards.length > 0 && (
+                    <TouchableOpacity style={{ marginTop: 25 }} onPress={() => setView("list")}>
+                      <Text style={{ color: theme.primary, fontWeight: '600' }}>Ver archivadas</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               )}
             </>
-          ) : (
-            <CardList cards={cards} onEdit={(card) => openEditModal(card)} onToggleLocal={handleLocalToggle} />
+          )}
+
+          {view === "list" && (
+            <CardList
+              cards={cards}
+              onEdit={(card) => openEditModal(card)}
+              onToggleLocal={handleLocalToggle}
+              theme={theme}
+            />
+          )}
+
+          {view === "classes" && user?.role === 'teacher' && (
+            <ClassesView
+              onBack={() => setView("flashcards")}
+              theme={theme}
+              onClassesUpdated={async () => {
+                const updatedClasses = await getTeacherClasses();
+                setTeacherClasses(updatedClasses);
+              }}
+            />
           )}
         </View>
       </SafeAreaView>
@@ -215,7 +286,8 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         onLogout={handleLogout}
         onNavigate={changeView}
-        userName={userName}
+        user={user}
+        theme={theme}
       />
 
       <CardModal
@@ -228,6 +300,9 @@ export default function App() {
             ? { pregunta: editingCard.pregunta, respuesta: editingCard.respuesta }
             : null
         }
+        user={user}
+        classes={teacherClasses}
+        theme={theme}
       />
     </View>
   );
@@ -236,7 +311,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
   },
   mainArea: {
     flex: 1,
@@ -245,7 +319,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
   },
   header: {
     flexDirection: "row",
@@ -253,61 +326,63 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 40 : 10,
-    paddingBottom: 20,
+    paddingBottom: 25,
   },
-  menuButton: {
-    width: 40,
-    height: 40,
+  iconButton: {
+    width: 45,
+    height: 45,
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 15,
   },
-  menuIcon: {
-    fontSize: 28,
-    color: "#1e293b",
+  iconText: {
+    fontSize: 24,
+  },
+  titleContainer: {
+    alignItems: "center",
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1e293b",
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  activeCount: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  flashcardContainer: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: 'center',
+    paddingBottom: 40,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#64748b",
-    marginBottom: 30,
-    textAlign: "center",
-  },
-  buttonsRow: {
+  actionRow: {
     flexDirection: "row",
     marginTop: 40,
-    gap: 15,
+    gap: 12,
+    width: '100%',
+    justifyContent: 'center',
   },
-  insertButton: {
-    backgroundColor: "#10b981",
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 30,
-    elevation: 3,
+  glassButton: {
+    paddingVertical: 18,
+    paddingHorizontal: 30,
+    borderRadius: 22,
+    minWidth: 140,
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  insertButtonText: {
+  mainBtnText: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  button: {
-    backgroundColor: "#3b82f6",
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    elevation: 3,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "bold",
   },
   emptyPrompt: {
@@ -317,13 +392,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: "#64748b",
-    marginBottom: 20,
+    marginBottom: 25,
+    textAlign: 'center',
   },
   primaryButton: {
-    backgroundColor: "#3b82f6",
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 30,
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+    elevation: 4,
   }
 });

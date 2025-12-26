@@ -8,6 +8,8 @@ import {
     Dimensions,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
+    StatusBar,
 } from "react-native";
 import Animated, {
     useSharedValue,
@@ -16,13 +18,18 @@ import Animated, {
 } from "react-native-reanimated";
 import { register, login } from "../services/service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { lightTheme, darkTheme } from "../theme";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-export default function AuthFlow({ onComplete }) {
+export default function RegistrationFlow({ onComplete, isDarkMode }) {
+    const theme = isDarkMode ? darkTheme : lightTheme;
+
     const [step, setStep] = useState(0);
     const [email, setEmail] = useState("");
     const [name, setName] = useState("");
+    const [institucion, setInstitucion] = useState("");
+    const [selectedRole, setSelectedRole] = useState("student");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
@@ -30,60 +37,50 @@ export default function AuthFlow({ onComplete }) {
 
     const translateX = useSharedValue(0);
 
-    const goToStep = (targetStep, duration = 500) => {
+    const goToStep = (targetStep) => {
         setError("");
         setStep(targetStep);
-        translateX.value = withTiming(-targetStep * width, { duration });
+        translateX.value = withTiming(-targetStep * width, { duration: 500 });
     };
 
-
-    const nextRegisterStep = () => {
-        if (step === 2 && !email.includes("@")) {
-            setError("Email inválido");
-            return;
-        }
-        if (step === 3 && name.length < 3) {
-            setError("Nombre demasiado corto");
-            return;
-        }
-        if (step === 4) {
-            if (password.length < 8) {
-                setError("La contraseña debe tener al menos 8 caracteres");
-                return;
-            }
-            if (password !== confirmPassword) {
-                setError("Las contraseñas no coinciden");
-                return;
-            }
-            handleFinalRegister();
-            return;
-        }
-
+    const handleNextRegister = () => {
         setError("");
-        goToStep(step + 1);
+        if (step === 2) {
+            if (!email.includes("@")) return setError("Ingresa un email válido");
+            goToStep(3);
+        } else if (step === 3) {
+            if (name.trim().length < 3) return setError("Ingresa tu nombre completo");
+            goToStep(4);
+        } else if (step === 4) {
+            if (password.length < 8) return setError("Mínimo 8 caracteres");
+            if (password !== confirmPassword) return setError("Las contraseñas no coinciden");
+            executeRegister();
+        }
     };
 
-    const handleFinalRegister = async () => {
+    async function executeRegister() {
         setLoading(true);
         try {
-            const result = await register(email, name, password);
+            const result = await register(email, name, password, selectedRole, institucion);
             await AsyncStorage.setItem("userToken", result.token);
+            await AsyncStorage.setItem("userData", JSON.stringify(result.user));
             await AsyncStorage.setItem("userName", result.user.name);
             goToStep(5);
-            setTimeout(() => onComplete(), 2000);
+            setTimeout(() => onComplete(), 1500);
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const handleLogin = async () => {
+    async function executeLogin() {
         setLoading(true);
         setError("");
         try {
             const result = await login(email, password);
             await AsyncStorage.setItem("userToken", result.token);
+            await AsyncStorage.setItem("userData", JSON.stringify(result.user));
             await AsyncStorage.setItem("userName", result.user.name);
             onComplete();
         } catch (err) {
@@ -91,251 +88,180 @@ export default function AuthFlow({ onComplete }) {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const animatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ translateX: translateX.value }],
-        };
-    });
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }],
+    }));
+
+    const renderInput = (placeholder, value, onChange, secure = false, keyboard = "default") => (
+        <TextInput
+            style={[styles.input, {
+                backgroundColor: theme.card,
+                borderColor: theme.glassBorder,
+                color: theme.text
+            }]}
+            placeholder={placeholder}
+            placeholderTextColor={theme.textSecondary}
+            value={value}
+            onChangeText={onChange}
+            secureTextEntry={secure}
+            keyboardType={keyboard}
+            autoCapitalize="none"
+        />
+    );
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.container}
-        >
-            <Animated.View style={[styles.flowWrapper, animatedStyle]}>
-                <View style={styles.stepContainer}>
-                    <Text style={styles.welcomeTitle}>Flashcards AI</Text>
-                    <Text style={styles.welcomeSub}>Aprende inglés de forma inteligente</Text>
-                    <TouchableOpacity style={styles.primaryButton} onPress={() => goToStep(1)}>
-                        <Text style={styles.buttonText}>Ingresar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={() => goToStep(2)}>
-                        <Text style={styles.secondaryButtonText}>Crear cuenta</Text>
-                    </TouchableOpacity>
-                </View>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <StatusBar style={isDarkMode ? "light" : "dark"} />
 
-                <View style={styles.stepContainer}>
-                    <Text style={styles.label}>Bienvenido de nuevo</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Contraseña"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                    <TouchableOpacity
-                        style={[styles.primaryButton, loading && { opacity: 0.7 }]}
-                        onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        <Text style={styles.buttonText}>{loading ? "Ingresando..." : "Ingresar"}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => goToStep(0)}>
-                        <Text style={styles.backLink}>Volver</Text>
-                    </TouchableOpacity>
-                </View>
+            {/* Background elements for depth */}
+            <View style={[styles.blob, { top: -50, right: -50, backgroundColor: theme.primary, opacity: 0.15 }]} />
+            <View style={[styles.blob, { bottom: -100, left: -50, backgroundColor: theme.accent, opacity: 0.15 }]} />
 
-                <View style={styles.stepContainer}>
-                    <Text style={styles.label}>Para empezar, ¿cuál es tu email?</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="email@ejemplo.com"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                    <TouchableOpacity style={styles.button} onPress={nextRegisterStep}>
-                        <Text style={styles.buttonText}>Siguiente</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => goToStep(0)}>
-                        <Text style={styles.backLink}>Volver</Text>
-                    </TouchableOpacity>
-                </View>
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+                <Animated.View style={[styles.flowWrapper, animatedStyle]}>
 
-                <View style={styles.stepContainer}>
-                    <Text style={styles.label}>¿Cómo te llamas?</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Nombre completo"
-                        value={name}
-                        onChangeText={setName}
-                    />
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                    <TouchableOpacity style={styles.button} onPress={nextRegisterStep}>
-                        <Text style={styles.buttonText}>Siguiente</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.stepContainer}>
-                    <Text style={styles.label}>Crea tu contraseña</Text>
-                    <Text style={styles.subLabel}>(Mínimo 8 caracteres)</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Contraseña"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Confirmar contraseña"
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        secureTextEntry
-                    />
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                    <TouchableOpacity
-                        style={[styles.button, loading && { opacity: 0.7 }]}
-                        onPress={nextRegisterStep}
-                        disabled={loading}
-                    >
-                        <Text style={styles.buttonText}>{loading ? "Registrando..." : "Finalizar"}</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.stepContainer}>
-                    <View style={styles.successCircle}>
-                        <Text style={styles.checkIcon}>✓</Text>
+                    {/* Step 0: Welcome */}
+                    <View style={styles.stepContainer}>
+                        <View style={styles.heroContent}>
+                            <Text style={[styles.brand, { color: theme.text }]}>Flashcards AI</Text>
+                            <Text style={[styles.tagline, { color: theme.textSecondary }]}>Domina el inglés con un sistema inteligente.</Text>
+                        </View>
+                        <View style={styles.btnStack}>
+                            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.primary }]} onPress={() => goToStep(1)}>
+                                <Text style={styles.mainBtnText}>Entrar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.ghostBtn, { borderColor: theme.primary }]} onPress={() => goToStep(2)}>
+                                <Text style={[styles.ghostBtnText, { color: theme.primary }]}>Crear cuenta gratis</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <Text style={styles.successText}>¡Registro completado!</Text>
-                </View>
-            </Animated.View>
-        </KeyboardAvoidingView>
+
+                    {/* Step 1: Login */}
+                    <View style={styles.stepContainer}>
+                        <Text style={[styles.stepTitle, { color: theme.text }]}>¡Qué bueno verte!</Text>
+                        <View style={styles.form}>
+                            {renderInput("Email", email, setEmail, false, "email-address")}
+                            {renderInput("Contraseña", password, setPassword, true)}
+                            {error ? <Text style={styles.error}>{error}</Text> : null}
+                            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.primary }]} onPress={executeLogin} disabled={loading}>
+                                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.mainBtnText}>Iniciar Sesión</Text>}
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => goToStep(0)}>
+                                <Text style={[styles.backBtn, { color: theme.textSecondary }]}>Volver al inicio</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Step 2: Register - Email */}
+                    <View style={styles.stepContainer}>
+                        <Text style={[styles.stepTitle, { color: theme.text }]}>Regístrate</Text>
+                        <Text style={[styles.stepSub, { color: theme.textSecondary }]}>¿A qué email te enviamos el progreso?</Text>
+                        <View style={styles.form}>
+                            {renderInput("tu@email.com", email, setEmail, false, "email-address")}
+                            {error ? <Text style={styles.error}>{error}</Text> : null}
+                            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.primary }]} onPress={handleNextRegister}>
+                                <Text style={styles.mainBtnText}>Siguiente</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => goToStep(0)}>
+                                <Text style={[styles.backBtn, { color: theme.textSecondary }]}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Step 3: Register - Profile */}
+                    <View style={styles.stepContainer}>
+                        <Text style={[styles.stepTitle, { color: theme.text }]}>Tu Perfil</Text>
+                        <View style={styles.roleContainer}>
+                            <TouchableOpacity
+                                style={[styles.roleBtn, { backgroundColor: theme.card, borderColor: theme.glassBorder }, selectedRole === "student" && { backgroundColor: theme.primary, borderColor: theme.primary }]}
+                                onPress={() => setSelectedRole("student")}
+                            >
+                                <Text style={[styles.roleBtnText, { color: theme.textSecondary }, selectedRole === "student" && { color: "#fff" }]}>Alumno</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.roleBtn, { backgroundColor: theme.card, borderColor: theme.glassBorder }, selectedRole === "teacher" && { backgroundColor: theme.primary, borderColor: theme.primary }]}
+                                onPress={() => setSelectedRole("teacher")}
+                            >
+                                <Text style={[styles.roleBtnText, { color: theme.textSecondary }, selectedRole === "teacher" && { color: "#fff" }]}>Profesor</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.form}>
+                            {renderInput("Tu nombre completo", name, setName)}
+                            {renderInput("Institución (opcional)", institucion, setInstitucion)}
+                            {error ? <Text style={styles.error}>{error}</Text> : null}
+                            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.primary }]} onPress={handleNextRegister}>
+                                <Text style={styles.mainBtnText}>Continuar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Step 4: Register - Pass */}
+                    <View style={styles.stepContainer}>
+                        <Text style={[styles.stepTitle, { color: theme.text }]}>Seguridad</Text>
+                        <View style={styles.form}>
+                            {renderInput("Crea una contraseña", password, setPassword, true)}
+                            {renderInput("Confirma contraseña", confirmPassword, setConfirmPassword, true)}
+                            {error ? <Text style={styles.error}>{error}</Text> : null}
+                            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.secondary }]} onPress={handleNextRegister} disabled={loading}>
+                                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.mainBtnText}>Finalizar</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Step 5: Success */}
+                    <View style={styles.stepContainer}>
+                        <View style={[styles.successBadge, { backgroundColor: theme.secondary }]}>
+                            <Text style={styles.check}>✓</Text>
+                        </View>
+                        <Text style={[styles.successTitle, { color: theme.text }]}>¡Todo listo!</Text>
+                        <Text style={[styles.successSub, { color: theme.textSecondary }]}>Preparando tu panel de estudio...</Text>
+                    </View>
+
+                </Animated.View>
+            </KeyboardAvoidingView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#f0f4f8",
-        overflow: "hidden",
-    },
-    flowWrapper: {
-        flexDirection: "row",
-        width: width * 6,
-        flex: 1,
-    },
-    stepContainer: {
-        width: width,
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 30,
-    },
-    welcomeTitle: {
-        fontSize: 40,
-        fontWeight: "bold",
-        color: "#1e293b",
-        marginBottom: 10,
-    },
-    welcomeSub: {
-        fontSize: 18,
-        color: "#64748b",
-        marginBottom: 50,
-        textAlign: "center",
-    },
-    label: {
-        fontSize: 24,
-        fontWeight: "bold",
-        textAlign: "center",
-        marginBottom: 10,
-        color: "#1e293b",
-    },
-    subLabel: {
-        fontSize: 14,
-        color: "#64748b",
-        marginBottom: 20,
-    },
+    container: { flex: 1, overflow: "hidden" },
+    blob: { position: "absolute", width: 300, height: 300, borderRadius: 150 },
+    flowWrapper: { flexDirection: "row", width: width * 6, flex: 1 },
+    stepContainer: { width, flex: 1, justifyContent: "center", alignItems: "center", padding: 30 },
+    heroContent: { alignItems: 'center', marginBottom: 60 },
+    brand: { fontSize: 46, fontWeight: "900", letterSpacing: -1.5 },
+    tagline: { fontSize: 18, textAlign: 'center', marginTop: 10, paddingHorizontal: 20 },
+    btnStack: { width: '100%', gap: 15, alignItems: 'center' },
+    stepTitle: { fontSize: 32, fontWeight: "800", marginBottom: 30, letterSpacing: -0.5 },
+    stepSub: { fontSize: 16, marginBottom: 20, textAlign: "center" },
+    form: { width: '100%', alignItems: 'center' },
     input: {
         width: width - 60,
-        backgroundColor: "#fff",
-        borderRadius: 15,
+        borderRadius: 22,
         padding: 20,
         fontSize: 18,
-        elevation: 2,
-        marginBottom: 20,
+        borderWidth: 1.5,
+        marginBottom: 15,
         height: 65,
-        color: "#000",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 1,
     },
-    primaryButton: {
-        backgroundColor: "#3b82f6",
-        paddingVertical: 18,
-        width: width - 80,
-        borderRadius: 30,
-        elevation: 3,
-        alignItems: "center",
-        marginBottom: 15,
-    },
-    secondaryButton: {
-        backgroundColor: "transparent",
-        paddingVertical: 18,
-        width: width - 80,
-        borderRadius: 30,
-        borderWidth: 2,
-        borderColor: "#3b82f6",
-        alignItems: "center",
-    },
-    secondaryButtonText: {
-        color: "#3b82f6",
-        fontSize: 18,
-        fontWeight: "bold",
-    },
-    button: {
-        backgroundColor: "#3b82f6",
-        paddingVertical: 15,
-        paddingHorizontal: 50,
-        borderRadius: 30,
-        elevation: 3,
-    },
-    buttonText: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "bold",
-    },
-    errorText: {
-        color: "#ef4444",
-        marginBottom: 15,
-        fontWeight: "500",
-        textAlign: "center",
-    },
-    backLink: {
-        marginTop: 20,
-        color: "#64748b",
-        fontSize: 16,
-        textDecorationLine: "underline",
-    },
-    successCircle: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: "#10b981",
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 20,
-        elevation: 10,
-    },
-    checkIcon: {
-        fontSize: 60,
-        color: "#fff",
-        fontWeight: "bold",
-    },
-    successText: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#1e293b",
-        textAlign: "center",
-    },
+    roleContainer: { flexDirection: "row", width: width - 60, marginBottom: 20, gap: 12 },
+    roleBtn: { flex: 1, padding: 18, alignItems: "center", borderWidth: 1.5, borderRadius: 20 },
+    roleBtnText: { fontSize: 16, fontWeight: "700" },
+    mainBtn: { width: width - 60, padding: 20, borderRadius: 22, alignItems: "center", elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+    mainBtnText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+    ghostBtn: { width: width - 60, padding: 18, borderRadius: 22, borderWidth: 2, alignItems: "center" },
+    ghostBtnText: { fontSize: 18, fontWeight: "bold" },
+    backBtn: { marginTop: 25, fontSize: 15, fontWeight: "600", textDecorationLine: "underline" },
+    error: { color: "#ef4444", marginBottom: 20, fontWeight: "600", textAlign: "center" },
+    successBadge: { width: 120, height: 120, borderRadius: 60, justifyContent: "center", alignItems: "center", marginBottom: 25, elevation: 10 },
+    check: { color: "#fff", fontSize: 60, fontWeight: "bold" },
+    successTitle: { fontSize: 30, fontWeight: "bold", marginBottom: 10 },
+    successSub: { fontSize: 18, textAlign: "center" }
 });

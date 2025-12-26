@@ -10,11 +10,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
-const SWIPE_THRESHOLD = 120; // Positive for swipe right
-
+const SWIPE_THRESHOLD = 120;
 const { width, height } = Dimensions.get("window");
 
-export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
+export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme }) {
     const [isFlipped, setIsFlipped] = useState(false);
     const [showAnswer, setShowAnswer] = useState(false);
     const rotation = useSharedValue(0);
@@ -23,7 +22,6 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
     const exitRotation = useSharedValue(0);
     const opacity = useSharedValue(1);
 
-    // Reset state when card changes
     useEffect(() => {
         setIsFlipped(false);
         setShowAnswer(false);
@@ -35,8 +33,7 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
     }, [card]);
 
     const animatedStyle = useAnimatedStyle(() => {
-        // Border color interpolation
-        const borderColor = interpolate(
+        const borderOpacity = interpolate(
             translateX.value,
             [0, SWIPE_THRESHOLD],
             [0, 1],
@@ -51,13 +48,13 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
                 { rotateY: `${rotation.value}deg` },
                 { rotate: `${exitRotation.value}deg` },
             ],
-            borderWidth: 4,
-            borderColor: `rgba(16, 185, 129, ${borderColor})`, // #10b981 (green)
-            shadowColor: "#10b981",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: borderColor * 0.5,
-            shadowRadius: borderColor * 15,
-            elevation: borderColor * 10,
+            borderWidth: 2,
+            borderColor: borderOpacity > 0 ? `rgba(16, 185, 129, ${borderOpacity})` : theme.glassBorder,
+            shadowColor: theme.shadow,
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: borderOpacity * 0.4 + 0.1,
+            shadowRadius: 20,
+            elevation: borderOpacity * 10 + 2,
         };
     });
 
@@ -65,23 +62,21 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
         const badgeOpacity = interpolate(
             translateX.value,
             [0, SWIPE_THRESHOLD / 2, SWIPE_THRESHOLD],
-            [0, 0.3, 0.6],
+            [0, 0.5, 1],
             Extrapolation.CLAMP
         );
         return {
             opacity: badgeOpacity,
             transform: [
-                { scale: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0.5, 1.2], Extrapolation.CLAMP) },
+                { scale: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0.8, 1.1], Extrapolation.CLAMP) },
                 { rotateY: `${-rotation.value}deg` }
             ],
         };
     });
 
-    const textAnimatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ rotateY: `${-rotation.value}deg` }],
-        };
-    });
+    const textAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ rotateY: `${-rotation.value}deg` }],
+    }));
 
     const flipCard = () => {
         if (isFlipped) {
@@ -96,20 +91,17 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
 
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
-            if (event.translationX > 0) { // Only swipe right
+            if (event.translationX > 0) {
                 translateX.value = event.translationX;
             }
         })
         .onEnd((event) => {
             if (event.translationX > SWIPE_THRESHOLD) {
-                // Exit animation: fall down-right with rotation
-                translateX.value = withTiming(width * 1.5, { duration: 500 });
-                translateY.value = withTiming(height, { duration: 500 });
-                exitRotation.value = withTiming(45, { duration: 500 });
-                opacity.value = withTiming(0, { duration: 400 }, (finished) => {
-                    if (finished) {
-                        runOnJS(onArchive)();
-                    }
+                translateX.value = withTiming(width * 1.5, { duration: 400 });
+                translateY.value = withTiming(height * 0.5, { duration: 400 });
+                exitRotation.value = withTiming(30, { duration: 400 });
+                opacity.value = withTiming(0, { duration: 300 }, (finished) => {
+                    if (finished) runOnJS(onArchive)();
                 });
             } else {
                 translateX.value = withTiming(0, { duration: 200 });
@@ -117,29 +109,39 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
         });
 
     return (
-        <View style={styles.card}>
+        <View style={styles.cardWrapper}>
             <GestureDetector gesture={panGesture}>
-                <Animated.View style={[styles.cardContainer, animatedStyle]}>
+                <Animated.View style={[
+                    styles.cardContainer,
+                    { backgroundColor: theme.card },
+                    animatedStyle
+                ]}>
                     <TouchableOpacity
                         style={styles.cardTouchable}
-                        activeOpacity={0.8}
+                        activeOpacity={1}
                         onPress={flipCard}
                         onLongPress={onLongPress}
                         delayLongPress={2000}
                     >
                         {/* Learned Badge */}
                         <Animated.View style={[styles.learnedBadge, badgeStyle]}>
-                            <Text style={styles.learnedText}>LEARNED!</Text>
+                            <Text style={styles.learnedText}>¡APRENDIDO!</Text>
                         </Animated.View>
 
                         <Animated.Text
-                            style={[styles.cardText, textAnimatedStyle]}
+                            style={[styles.cardText, { color: theme.text }, textAnimatedStyle]}
                             adjustsFontSizeToFit={true}
                             numberOfLines={12}
-                            minimumFontScale={0.4}
+                            minimumFontScale={0.5}
                         >
                             {showAnswer ? card.respuesta : card.pregunta}
                         </Animated.Text>
+
+                        <View style={styles.cardFooter}>
+                            <Animated.Text style={[styles.tapHint, { color: theme.textSecondary }, textAnimatedStyle]}>
+                                Toca para {isFlipped ? "ver pregunta" : "ver respuesta"}
+                            </Animated.Text>
+                        </View>
 
                         <TouchableOpacity style={styles.editButton} onPress={onEdit}>
                             <Animated.Text style={[styles.editButtonText, textAnimatedStyle]}>
@@ -153,54 +155,66 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
     );
 }
 
-const HEIGHT_CARD = 500;
+const HEIGHT_CARD = 480;
 
 const styles = StyleSheet.create({
-    card: {
-        width: "100%",
+    cardWrapper: {
+        width: width * 0.9,
         height: HEIGHT_CARD,
     },
     cardContainer: {
         flex: 1,
-        borderRadius: 20,
-        backgroundColor: "#fff",
-        overflow: "hidden", // Important to contain the badge
+        borderRadius: 32,
+        overflow: "hidden",
     },
     cardTouchable: {
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
-        padding: 20,
+        padding: 40,
     },
     learnedBadge: {
         position: "absolute",
         top: "40%",
         alignSelf: "center",
         backgroundColor: "#10b981",
-        paddingVertical: 10,
-        paddingHorizontal: 30,
-        borderRadius: 15,
-        zIndex: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 25,
+        borderRadius: 20,
+        zIndex: 50,
+        elevation: 8,
     },
     learnedText: {
         color: "#fff",
-        fontSize: 28,
-        fontWeight: "bold",
+        fontSize: 24,
+        fontWeight: "900",
+        letterSpacing: 1,
     },
     cardText: {
-        fontSize: 30,
+        fontSize: 32,
         textAlign: "center",
-        color: "#1e293b",
-        fontWeight: "500",
+        fontWeight: "700",
+        lineHeight: 40,
+    },
+    cardFooter: {
+        position: 'absolute',
+        bottom: 30,
+    },
+    tapHint: {
+        fontSize: 13,
+        fontWeight: "600",
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        opacity: 0.6,
     },
     editButton: {
         position: "absolute",
-        top: 15,
-        right: 15,
-        padding: 5,
+        top: 25,
+        right: 25,
+        padding: 10,
         zIndex: 10,
     },
     editButtonText: {
-        fontSize: 24,
+        fontSize: 22,
     },
 });

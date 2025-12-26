@@ -18,12 +18,12 @@ async function getAuthHeaders() {
     }
 }
 
-export async function register(email, name, password) {
+export async function register(email, name, password, role, institucion) {
     try {
         const response = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, name, password }),
+            body: JSON.stringify({ email, name, password, role, institucion }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Error en el registro");
@@ -65,13 +65,13 @@ export async function getCards() {
     }
 }
 
-export async function addCard(pregunta, respuesta) {
+export async function addCard(pregunta, respuesta, selectedClase = null) {
     try {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_URL}/cards`, {
             method: "POST",
             headers,
-            body: JSON.stringify({ pregunta, respuesta }),
+            body: JSON.stringify({ pregunta, respuesta, selectedClase }),
         });
         if (!response.ok) {
             const errorData = await response.json();
@@ -138,6 +138,76 @@ export async function batchUpdateArchive(updates) {
         return await response.json();
     } catch (error) {
         console.error("batchUpdateArchive error:", error.message);
-        throw error; // Rethrow so the caller can handle it
+        throw error;
+    }
+}
+
+// --- TEACHER SERVICES ---
+
+export async function searchStudents(query) {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/teachers/students/search?q=${encodeURIComponent(query)}`, { headers });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error("searchStudents error:", error);
+        return [];
+    }
+}
+
+export async function getTeacherClasses() {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/teachers/classes`, { headers });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error("getTeacherClasses error:", error);
+        return [];
+    }
+}
+
+export async function getClassStudents(className) {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/teachers/classes/${encodeURIComponent(className)}/students`, { headers });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error("getClassStudents error:", error);
+        return [];
+    }
+}
+
+export async function assignStudentsToClass(className, studentIds) {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/teachers/classes`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ className, studentIds }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Error al asignar alumnos");
+        return data;
+    } catch (error) {
+        console.error("assignStudentsToClass error:", error);
+        throw error;
+    }
+}
+
+export async function removeStudentFromClass(className, studentId) {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/teachers/classes/${encodeURIComponent(className)}/students/${studentId}`, {
+            method: "DELETE",
+            headers,
+        });
+        if (!response.ok) throw new Error("Error al eliminar alumno");
+        return await response.json();
+    } catch (error) {
+        console.error("removeStudentFromClass error:", error);
+        throw error;
     }
 }

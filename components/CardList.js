@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
     StyleSheet,
     View,
@@ -8,19 +8,20 @@ import {
     Switch,
 } from "react-native";
 
-export default function CardList({ cards, onEdit, onToggleLocal }) {
-    // We expect onToggleLocal to update the parent state locally, 
-    // and when the user leaves this view, we'll sync with the API.
+export default function CardList({ cards, onEdit, onToggleLocal, theme }) {
 
     const renderItem = ({ item }) => (
-        <View style={[styles.row, item.is_active === 0 && styles.rowInactive]}>
+        <View style={[
+            styles.row,
+            { backgroundColor: item.is_active === 1 ? theme.card : theme.card + '50', borderColor: theme.glassBorder }
+        ]}>
             <View style={[styles.cell, { flex: 2 }]}>
-                <Text style={[styles.cellText, item.is_active === 0 && styles.textInactive]} numberOfLines={2}>
+                <Text style={[styles.cellText, { color: theme.text }, item.is_active === 0 && { color: theme.textSecondary, opacity: 0.6 }]} numberOfLines={2}>
                     {item.pregunta}
                 </Text>
             </View>
             <View style={[styles.cell, { flex: 2 }]}>
-                <Text style={[styles.cellText, item.is_active === 0 && styles.textInactive]} numberOfLines={2}>
+                <Text style={[styles.cellText, { color: theme.text }, item.is_active === 0 && { color: theme.textSecondary, opacity: 0.6 }]} numberOfLines={2}>
                     {item.respuesta}
                 </Text>
             </View>
@@ -29,11 +30,11 @@ export default function CardList({ cards, onEdit, onToggleLocal }) {
                 <Switch
                     value={item.is_active === 1}
                     onValueChange={(val) => onToggleLocal(item.id, val)}
-                    trackColor={{ false: "#cbd5e1", true: "#93c5fd" }}
-                    thumbColor={item.is_active === 1 ? "#3b82f6" : "#f1f5f9"}
+                    trackColor={{ false: "#94a3b8", true: theme.primary + '80' }}
+                    thumbColor={item.is_active === 1 ? theme.primary : "#f1f5f9"}
                 />
                 <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(item)}>
-                    <Text style={styles.editBtnText}>✏️</Text>
+                    <Text style={styles.editIcon}>✏️</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -41,10 +42,10 @@ export default function CardList({ cards, onEdit, onToggleLocal }) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={[styles.headerText, { flex: 2 }]}>Pregunta</Text>
-                <Text style={[styles.headerText, { flex: 2 }]}>Respuesta</Text>
-                <Text style={[styles.headerText, { width: 80, textAlign: "center" }]}>Estado / Edit</Text>
+            <View style={[styles.header, { borderBottomColor: theme.glassBorder, backgroundColor: theme.card + '80' }]}>
+                <Text style={[styles.headerText, { flex: 2, color: theme.textSecondary }]}>Pregunta</Text>
+                <Text style={[styles.headerText, { flex: 2, color: theme.textSecondary }]}>Respuesta</Text>
+                <Text style={[styles.headerText, { width: 85, textAlign: "center", color: theme.textSecondary }]}>Activa / Ed</Text>
             </View>
             <FlatList
                 data={cards}
@@ -52,7 +53,9 @@ export default function CardList({ cards, onEdit, onToggleLocal }) {
                 renderItem={renderItem}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    <Text style={styles.emptyText}>No hay tarjetas guardadas.</Text>
+                    <View style={styles.emptyContainer}>
+                        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No hay tarjetas guardadas aún.</Text>
+                    </View>
                 }
             />
         </View>
@@ -63,67 +66,60 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         width: "100%",
-        backgroundColor: "#fff",
-        borderRadius: 20,
+        borderRadius: 25,
         overflow: "hidden",
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
     },
     header: {
         flexDirection: "row",
-        backgroundColor: "#f8fafc",
-        padding: 15,
+        padding: 18,
         borderBottomWidth: 1,
-        borderBottomColor: "#e2e8f0",
     },
     headerText: {
-        fontWeight: "bold",
-        color: "#64748b",
-        fontSize: 14,
+        fontWeight: "800",
+        fontSize: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     row: {
         flexDirection: "row",
-        padding: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f1f5f9",
+        padding: 20,
+        marginHorizontal: 10,
+        marginVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
         alignItems: "center",
-    },
-    rowInactive: {
-        backgroundColor: "#f8fafc",
     },
     cell: {
         paddingRight: 10,
     },
     cellText: {
-        color: "#1e293b",
-        fontSize: 15,
-    },
-    textInactive: {
-        color: "#94a3b8",
-        textDecorationLine: "line-through",
+        fontSize: 16,
+        fontWeight: "600",
     },
     actions: {
         flexDirection: "row",
         alignItems: "center",
-        width: 80,
+        width: 85,
         justifyContent: "space-between",
     },
     editBtn: {
-        padding: 5,
+        padding: 8,
+        backgroundColor: 'rgba(150,150,150,0.1)',
+        borderRadius: 12,
     },
-    editBtnText: {
-        fontSize: 18,
+    editIcon: {
+        fontSize: 16,
     },
     listContent: {
-        paddingBottom: 20,
+        paddingTop: 10,
+        paddingBottom: 30,
+    },
+    emptyContainer: {
+        marginTop: 60,
+        alignItems: 'center',
     },
     emptyText: {
-        textAlign: "center",
-        marginTop: 50,
-        color: "#64748b",
-        fontSize: 16,
+        fontSize: 17,
+        fontWeight: '500',
     },
 });
