@@ -46,9 +46,9 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
         return {
             opacity: opacity.value,
             transform: [
-                { rotateY: `${rotation.value}deg` },
                 { translateX: translateX.value },
                 { translateY: translateY.value },
+                { rotateY: `${rotation.value}deg` },
                 { rotate: `${exitRotation.value}deg` },
             ],
             borderWidth: 4,
@@ -70,7 +70,10 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
         );
         return {
             opacity: badgeOpacity,
-            transform: [{ scale: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0.5, 1.2], Extrapolation.CLAMP) }],
+            transform: [
+                { scale: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0.5, 1.2], Extrapolation.CLAMP) },
+                { rotateY: `${-rotation.value}deg` }
+            ],
         };
     });
 
@@ -129,7 +132,12 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive }) {
                             <Text style={styles.learnedText}>LEARNED!</Text>
                         </Animated.View>
 
-                        <Animated.Text style={[styles.cardText, textAnimatedStyle]}>
+                        <Animated.Text
+                            style={[styles.cardText, textAnimatedStyle]}
+                            adjustsFontSizeToFit={true}
+                            numberOfLines={12}
+                            minimumFontScale={0.4}
+                        >
                             {showAnswer ? card.respuesta : card.pregunta}
                         </Animated.Text>
 

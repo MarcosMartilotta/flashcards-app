@@ -268,6 +268,7 @@ const styles = StyleSheet.create({
         elevation: 2,
         marginBottom: 20,
         height: 65,
+        color: "#000",
     },
     primaryButton: {
         backgroundColor: "#3b82f6",

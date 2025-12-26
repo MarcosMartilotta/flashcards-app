@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         marginBottom: 15,
         fontSize: 18,
+        color: "#000",
     },
     modalButtons: {
         flexDirection: "row",
