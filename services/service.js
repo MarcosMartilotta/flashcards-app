@@ -211,3 +211,25 @@ export async function removeStudentFromClass(className, studentId) {
         throw error;
     }
 }
+
+export async function translateTexts(texts, target = 'en') {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/translate`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ texts, target }),
+        });
+        if (!response.ok) throw new Error("Error en la traducción");
+        const data = await response.json();
+        // Add safety check for response structure
+        if (data && data.data && data.data.translations) {
+            return data.data.translations;
+        }
+        console.error("Unexpected translation response structure:", data);
+        return null;
+    } catch (error) {
+        console.error("translateTexts error:", error);
+        return null;
+    }
+}

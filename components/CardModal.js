@@ -7,7 +7,9 @@ import {
     TouchableOpacity,
     StyleSheet,
     ScrollView,
+    ActivityIndicator,
 } from "react-native";
+import { translateTexts } from "../services/service";
 
 export default function CardModal({
     visible,
@@ -31,6 +33,41 @@ export default function CardModal({
         }
     }, [visible, initialData]);
 
+    const [isTranslatingP, setIsTranslatingP] = useState(false);
+    const [isTranslatingR, setIsTranslatingR] = useState(false);
+
+    const handleTranslate = async (field) => {
+        const text = field === 'pregunta' ? pregunta : respuesta;
+        if (!text.trim()) return;
+
+        if (field === 'pregunta') setIsTranslatingP(true);
+        else setIsTranslatingR(true);
+
+        try {
+            // First attempt: translate to English
+            let translations = await translateTexts([text], "en");
+            if (translations && translations.length === 1) {
+                const det = translations[0].detectedSourceLanguage;
+
+                // If it was already English, translate to Spanish instead
+                if (det === 'en') {
+                    translations = await translateTexts([text], "es");
+                }
+
+                if (translations && translations.length === 1) {
+                    if (field === 'pregunta') setPregunta(translations[0].translatedText);
+                    else setRespuesta(translations[0].translatedText);
+                }
+            }
+        } catch (error) {
+            console.error("Translation error:", error);
+            alert("Error al traducir.");
+        } finally {
+            setIsTranslatingP(false);
+            setIsTranslatingR(false);
+        }
+    };
+
     const handleSave = () => {
         if (!pregunta.trim() || !respuesta.trim()) {
             alert("Por favor, completa ambos campos.");
@@ -47,27 +84,55 @@ export default function CardModal({
                         <Text style={[styles.closeXText, { color: theme.textSecondary }]}>✕</Text>
                     </TouchableOpacity>
 
-                    <Text style={[styles.modalTitle, { color: theme.text }]}>
-                        {isEditing ? "Editar Flashcard" : "Nueva Flashcard"}
-                    </Text>
+                    <View style={styles.headerRow}>
+                        <Text style={[styles.modalTitle, { color: theme.text }]}>
+                            {isEditing ? "Editar Flashcard" : "Nueva Flashcard"}
+                        </Text>
+                    </View>
 
-                    <TextInput
-                        style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.glassBorder }]}
-                        placeholder="Pregunta"
-                        placeholderTextColor={theme.textSecondary}
-                        value={pregunta}
-                        onChangeText={setPregunta}
-                        multiline
-                    />
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.glassBorder }]}
+                            placeholder="Pregunta"
+                            placeholderTextColor={theme.textSecondary}
+                            value={pregunta}
+                            onChangeText={setPregunta}
+                            multiline
+                        />
+                        <TouchableOpacity
+                            style={[styles.inlineTranslateBtn]}
+                            onPress={() => handleTranslate('pregunta')}
+                            disabled={isTranslatingP}
+                        >
+                            {isTranslatingP ? (
+                                <ActivityIndicator size="small" color={theme.primary} />
+                            ) : (
+                                <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir pregunta</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
 
-                    <TextInput
-                        style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.glassBorder }]}
-                        placeholder="Respuesta"
-                        placeholderTextColor={theme.textSecondary}
-                        value={respuesta}
-                        onChangeText={setRespuesta}
-                        multiline
-                    />
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.glassBorder }]}
+                            placeholder="Respuesta"
+                            placeholderTextColor={theme.textSecondary}
+                            value={respuesta}
+                            onChangeText={setRespuesta}
+                            multiline
+                        />
+                        <TouchableOpacity
+                            style={[styles.inlineTranslateBtn]}
+                            onPress={() => handleTranslate('respuesta')}
+                            disabled={isTranslatingR}
+                        >
+                            {isTranslatingR ? (
+                                <ActivityIndicator size="small" color={theme.primary} />
+                            ) : (
+                                <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir respuesta</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
 
                     {user?.role === 'teacher' && !isEditing && (
                         <View style={styles.classSection}>
@@ -140,11 +205,32 @@ const styles = StyleSheet.create({
         marginBottom: 25,
         textAlign: "center",
         letterSpacing: -0.5,
+        marginBottom: 0,
+    },
+    headerRow: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 25,
+    },
+    inputWrapper: {
+        marginBottom: 20,
+    },
+    inlineTranslateBtn: {
+        alignSelf: 'flex-end',
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        marginTop: -10,
+        marginBottom: 5,
+    },
+    translateBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
     },
     input: {
         padding: 18,
         borderRadius: 20,
-        marginBottom: 15,
+        marginBottom: 12,
         fontSize: 18,
         borderWidth: 1,
         minHeight: 80,

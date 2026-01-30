@@ -6,7 +6,7 @@
 
 ## 🚀 Propósito del Proyecto
 
-El objetivo de **Flashcards AI** es revolucionar la forma en que los estudiantes de idiomas interactúan con el vocabulario y los conceptos nuevos. A diferencia de las aplicaciones de tarjetas tradicionales, nuestra plataforma integra una **jerarquía educativa completa**:
+El objetivo de **PeakCards** es revolucionar la forma en que los estudiantes de idiomas interactúan con el vocabulario y los conceptos nuevos. A diferencia de las aplicaciones de tarjetas tradicionales, nuestra plataforma integra una **jerarquía educativa completa**:
 
 1.  **Aprendizaje Inteligente**: Los alumnos pueden estudiar mediante un sistema de flashcards con gestos táctiles fluidos (swipe & flip).
 2.  **Gestión Académica**: Los profesores pueden crear clases, gestionar alumnos de instituciones específicas y distribuir contenido educativo de manera instantánea.

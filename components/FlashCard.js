@@ -13,7 +13,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 const SWIPE_THRESHOLD = 120;
 const { width, height } = Dimensions.get("window");
 
-export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme }) {
+export default function FlashCard({ card, onLongPress, onEdit, onArchive, onNext, theme }) {
     const [isFlipped, setIsFlipped] = useState(false);
     const [showAnswer, setShowAnswer] = useState(false);
     const rotation = useSharedValue(0);
@@ -33,12 +33,16 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme 
     }, [card]);
 
     const animatedStyle = useAnimatedStyle(() => {
-        const borderOpacity = interpolate(
+        const borderColor = interpolate(
             translateX.value,
-            [0, SWIPE_THRESHOLD],
-            [0, 1],
+            [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
+            [1, 0, 1],
             Extrapolation.CLAMP
         );
+
+        const colorMode = translateX.value > 0
+            ? `rgba(16, 185, 129, ${borderColor})` // Green for right
+            : `rgba(239, 68, 68, ${borderColor})`; // Red for left
 
         return {
             opacity: opacity.value,
@@ -49,12 +53,12 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme 
                 { rotate: `${exitRotation.value}deg` },
             ],
             borderWidth: 2,
-            borderColor: borderOpacity > 0 ? `rgba(16, 185, 129, ${borderOpacity})` : theme.glassBorder,
+            borderColor: borderColor > 0 ? colorMode : theme.glassBorder,
             shadowColor: theme.shadow,
             shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: borderOpacity * 0.4 + 0.1,
+            shadowOpacity: borderColor * 0.4 + 0.1,
             shadowRadius: 20,
-            elevation: borderOpacity * 10 + 2,
+            elevation: borderColor * 10 + 2,
         };
     });
 
@@ -69,6 +73,22 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme 
             opacity: badgeOpacity,
             transform: [
                 { scale: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0.8, 1.1], Extrapolation.CLAMP) },
+                { rotateY: `${-rotation.value}deg` }
+            ],
+        };
+    });
+
+    const practiceBadgeStyle = useAnimatedStyle(() => {
+        const badgeOpacity = interpolate(
+            translateX.value,
+            [-SWIPE_THRESHOLD, -SWIPE_THRESHOLD / 2, 0],
+            [1, 0.5, 0],
+            Extrapolation.CLAMP
+        );
+        return {
+            opacity: badgeOpacity,
+            transform: [
+                { scale: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1.1, 0.8], Extrapolation.CLAMP) },
                 { rotateY: `${-rotation.value}deg` }
             ],
         };
@@ -91,17 +111,24 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme 
 
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
-            if (event.translationX > 0) {
-                translateX.value = event.translationX;
-            }
+            translateX.value = event.translationX;
         })
         .onEnd((event) => {
             if (event.translationX > SWIPE_THRESHOLD) {
+                // Swipe Right -> ARCHIVE
                 translateX.value = withTiming(width * 1.5, { duration: 400 });
                 translateY.value = withTiming(height * 0.5, { duration: 400 });
                 exitRotation.value = withTiming(30, { duration: 400 });
                 opacity.value = withTiming(0, { duration: 300 }, (finished) => {
                     if (finished) runOnJS(onArchive)();
+                });
+            } else if (event.translationX < -SWIPE_THRESHOLD) {
+                // Swipe Left -> NEXT
+                translateX.value = withTiming(-width * 1.5, { duration: 400 });
+                translateY.value = withTiming(height * 0.5, { duration: 400 });
+                exitRotation.value = withTiming(-30, { duration: 400 });
+                opacity.value = withTiming(0, { duration: 300 }, (finished) => {
+                    if (finished) runOnJS(onNext)();
                 });
             } else {
                 translateX.value = withTiming(0, { duration: 200 });
@@ -126,6 +153,11 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, theme 
                         {/* Learned Badge */}
                         <Animated.View style={[styles.learnedBadge, badgeStyle]}>
                             <Text style={styles.learnedText}>¡APRENDIDO!</Text>
+                        </Animated.View>
+
+                        {/* Practice Badge */}
+                        <Animated.View style={[styles.practiceBadge, practiceBadgeStyle]}>
+                            <Text style={styles.learnedText}>SEGUIR PRACTICANDO</Text>
                         </Animated.View>
 
                         <Animated.Text
@@ -184,11 +216,23 @@ const styles = StyleSheet.create({
         zIndex: 50,
         elevation: 8,
     },
+    practiceBadge: {
+        position: "absolute",
+        top: "40%",
+        alignSelf: "center",
+        backgroundColor: "#ef4444",
+        paddingVertical: 12,
+        paddingHorizontal: 25,
+        borderRadius: 20,
+        zIndex: 50,
+        elevation: 8,
+    },
     learnedText: {
         color: "#fff",
-        fontSize: 24,
+        fontSize: 18,
         fontWeight: "900",
         letterSpacing: 1,
+        textAlign: 'center',
     },
     cardText: {
         fontSize: 32,

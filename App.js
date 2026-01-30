@@ -221,6 +221,7 @@ export default function App() {
                     onLongPress={() => openEditModal()}
                     onEdit={() => openEditModal()}
                     onArchive={() => handleArchiveToggle(currentCard.id, false)}
+                    onNext={handleNextCard}
                     theme={theme}
                   />
 
