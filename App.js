@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { getCards, addCard, updateCard, toggleArchiveCard, batchUpdateArchive, getTeacherClasses } from "./services/service";
 import FlashCard from "./components/FlashCard";
 import CardModal from "./components/CardModal";
+import ImportModal from "./components/ImportModal";
 import RegistrationFlow from "./components/RegistrationFlow";
 import Sidebar from "./components/Sidebar";
 import CardList from "./components/CardList";
@@ -31,6 +32,7 @@ export default function App() {
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false); // false = crear, true = editar
   const [editingCard, setEditingCard] = useState(null);
 
@@ -287,6 +289,7 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         onLogout={handleLogout}
         onNavigate={changeView}
+        onImport={() => setImportModalVisible(true)}
         user={user}
         theme={theme}
       />
@@ -302,6 +305,14 @@ export default function App() {
             : null
         }
         user={user}
+        classes={teacherClasses}
+        theme={theme}
+      />
+
+      <ImportModal
+        visible={importModalVisible}
+        onClose={() => setImportModalVisible(false)}
+        onImportSuccess={loadCards}
         classes={teacherClasses}
         theme={theme}
       />

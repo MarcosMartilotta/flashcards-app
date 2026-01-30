@@ -84,6 +84,25 @@ export async function addCard(pregunta, respuesta, selectedClase = null) {
     }
 }
 
+export async function bulkCreateCards(cards, selectedClase = null) {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/cards/bulk`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ cards, selectedClase }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Error adding cards: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("bulkCreateCards error:", error.message);
+        throw error;
+    }
+}
+
 export async function updateCard(id, pregunta, respuesta) {
     try {
         const headers = await getAuthHeaders();

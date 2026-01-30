@@ -14,7 +14,7 @@ import Animated, {
 
 const { width, height } = Dimensions.get("window");
 
-export default function Sidebar({ isOpen, onClose, onLogout, onNavigate, user, theme }) {
+export default function Sidebar({ isOpen, onClose, onLogout, onNavigate, onImport, user, theme }) {
     const translateX = useSharedValue(-width * 0.85);
 
     useEffect(() => {
@@ -80,6 +80,13 @@ export default function Sidebar({ isOpen, onClose, onLogout, onNavigate, user, t
                             icon="🎓"
                             label="Mis Clases"
                             onPress={() => { onNavigate("classes"); onClose(); }}
+                        />
+                    )}
+                    {user?.role === 'teacher' && (
+                        <MenuItem
+                            icon="📥"
+                            label="Importar Excel"
+                            onPress={() => { onImport && onImport(); onClose(); }}
                         />
                     )}
                 </View>

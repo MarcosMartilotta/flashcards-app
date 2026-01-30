@@ -8,7 +8,47 @@ import {
     Switch,
 } from "react-native";
 
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import XLSX from 'xlsx';
+
 export default function CardList({ cards, onEdit, onToggleLocal, theme }) {
+
+    const handleExport = async () => {
+        try {
+            // Prepare data
+            const data = cards.map(c => ({
+                Pregunta: c.pregunta,
+                Respuesta: c.respuesta,
+                Activa: c.is_active ? "Sí" : "No",
+                Clase: c.clase || "N/A"
+            }));
+
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Mis Tarjetas");
+
+            // Write to base64
+            const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+            // Save to temporary file
+            const uri = FileSystem.cacheDirectory + 'mis_flashcards.xlsx';
+            await FileSystem.writeAsStringAsync(uri, wbout, {
+                encoding: 'base64'
+            });
+
+            // Share file
+            await Sharing.shareAsync(uri, {
+                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                dialogTitle: 'Exportar Flashcards'
+            });
+
+        } catch (error) {
+            console.error("Export error:", error);
+            alert("No se pudo exportar el archivo.");
+        }
+    };
 
     const renderItem = ({ item }) => (
         <View style={[
@@ -58,6 +98,15 @@ export default function CardList({ cards, onEdit, onToggleLocal, theme }) {
                     </View>
                 }
             />
+
+            {/* Export FAB */}
+            <TouchableOpacity
+                style={[styles.exportFab, { backgroundColor: theme.success || '#10b981' }]}
+                onPress={handleExport}
+                activeOpacity={0.8}
+            >
+                <Text style={styles.fabIcon}>📤</Text>
+            </TouchableOpacity>
         </View>
     );
 }
@@ -112,7 +161,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingTop: 10,
-        paddingBottom: 30,
+        paddingBottom: 80, // Extra padding for FAB
     },
     emptyContainer: {
         marginTop: 60,
@@ -122,4 +171,23 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '500',
     },
+    exportFab: {
+        position: 'absolute',
+        bottom: 25,
+        left: 25,
+        width: 55,
+        height: 55,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 6,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        zIndex: 100,
+    },
+    fabIcon: {
+        fontSize: 24,
+    }
 });
