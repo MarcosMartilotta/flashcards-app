@@ -13,19 +13,17 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.marcosmartilotta.flashcardsapp"
     },
     "android": {
       "package": "com.marcosmartilotta.flashcardsapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
+      }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    "plugins": [],
     "extra": {
       "eas": {
         "projectId": "c4d91265-23b2-447c-8ec5-dfdc77e35c2b"

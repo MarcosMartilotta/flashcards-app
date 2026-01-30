@@ -16,7 +16,8 @@ import {
     searchStudents,
     assignStudentsToClass,
     getClassStudents,
-    removeStudentFromClass
+    removeStudentFromClass,
+    translateTexts
 } from "../services/service";
 
 export default function ClassesView({ theme, onClassesUpdated }) {
@@ -29,6 +30,7 @@ export default function ClassesView({ theme, onClassesUpdated }) {
     const [selectedStudents, setSelectedStudents] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [isTranslatingClassName, setIsTranslatingClassName] = useState(false);
     const searchTimer = useRef(null);
 
     // Detail state
@@ -127,6 +129,33 @@ export default function ClassesView({ theme, onClassesUpdated }) {
         setModalVisible(true);
     };
 
+    const handleTranslateClassName = async () => {
+        if (!newClassName.trim()) return;
+
+        setIsTranslatingClassName(true);
+        try {
+            // First attempt: translate to English
+            let translations = await translateTexts([newClassName], "en");
+            if (translations && translations.length === 1) {
+                const det = translations[0].detectedSourceLanguage;
+
+                // If it was already English, translate to Spanish instead
+                if (det === 'en') {
+                    translations = await translateTexts([newClassName], "es");
+                }
+
+                if (translations && translations.length === 1) {
+                    setNewClassName(translations[0].translatedText);
+                }
+            }
+        } catch (error) {
+            console.error("Translation error:", error);
+            Alert.alert("Error", "Error al traducir.");
+        } finally {
+            setIsTranslatingClassName(false);
+        }
+    };
+
     if (loading) {
         return <ActivityIndicator size="large" color={theme.primary} style={styles.loader} />;
     }
@@ -179,13 +208,26 @@ export default function ClassesView({ theme, onClassesUpdated }) {
                         <Text style={[styles.modalTitle, { color: theme.text }]}>{isEditing ? `Sumar a ${selectedClass}` : "Nueva Clase"}</Text>
 
                         {!isEditing && (
-                            <TextInput
-                                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.glassBorder }]}
-                                placeholder="Nombre de la clase"
-                                value={newClassName}
-                                onChangeText={setNewClassName}
-                                placeholderTextColor={theme.textSecondary}
-                            />
+                            <View style={styles.inputWrapper}>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.glassBorder }]}
+                                    placeholder="Nombre de la clase"
+                                    value={newClassName}
+                                    onChangeText={setNewClassName}
+                                    placeholderTextColor={theme.textSecondary}
+                                />
+                                <TouchableOpacity
+                                    style={styles.inlineTranslateBtn}
+                                    onPress={handleTranslateClassName}
+                                    disabled={isTranslatingClassName}
+                                >
+                                    {isTranslatingClassName ? (
+                                        <ActivityIndicator size="small" color={theme.primary} />
+                                    ) : (
+                                        <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir nombre</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         )}
 
                         <Text style={[styles.label, { color: theme.textSecondary }]}>Buscar alumnos:</Text>
@@ -317,7 +359,20 @@ const styles = StyleSheet.create({
     detailHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
     addSmallBtn: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 15 },
     addSmallBtnText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-    input: { padding: 18, borderRadius: 18, fontSize: 17, borderWidth: 1, marginBottom: 20 },
+    inputWrapper: { marginBottom: 20, width: '100%' },
+    input: { padding: 18, borderRadius: 18, fontSize: 17, borderWidth: 1, marginBottom: 12 },
+    inlineTranslateBtn: {
+        alignSelf: 'flex-end',
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        marginTop: -10,
+        marginBottom: 5,
+    },
+    translateBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
     label: { fontSize: 15, fontWeight: "800", marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
     searchContainer: { flexDirection: "row", alignItems: "center", borderRadius: 18, borderWidth: 1.5 },
     searchInput: { flex: 1, padding: 18, fontSize: 17 },

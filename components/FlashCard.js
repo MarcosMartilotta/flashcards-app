@@ -9,6 +9,7 @@ import Animated, {
     Extrapolation,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import * as Speech from 'expo-speech';
 
 const SWIPE_THRESHOLD = 120;
 const { width, height } = Dimensions.get("window");
@@ -109,6 +110,15 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, onNext
         setIsFlipped(!isFlipped);
     };
 
+    const handleSpeak = () => {
+        const textToSpeak = showAnswer ? card.respuesta : card.pregunta;
+        Speech.stop();
+        Speech.speak(textToSpeak, {
+            language: 'en-US',
+            rate: 0.8,
+        });
+    };
+
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
             translateX.value = event.translationX;
@@ -175,6 +185,14 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, onNext
                             </Animated.Text>
                         </View>
 
+                        {/* Speaker Button - Top Left */}
+                        <TouchableOpacity style={styles.speakerButton} onPress={handleSpeak}>
+                            <Animated.Text style={[styles.speakerButtonText, textAnimatedStyle]}>
+                                🔊
+                            </Animated.Text>
+                        </TouchableOpacity>
+
+                        {/* Edit Button - Top Right */}
                         <TouchableOpacity style={styles.editButton} onPress={onEdit}>
                             <Animated.Text style={[styles.editButtonText, textAnimatedStyle]}>
                                 ✏️
@@ -250,6 +268,16 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 1,
         opacity: 0.6,
+    },
+    speakerButton: {
+        position: "absolute",
+        top: 25,
+        left: 25,
+        padding: 10,
+        zIndex: 10,
+    },
+    speakerButtonText: {
+        fontSize: 22,
     },
     editButton: {
         position: "absolute",
