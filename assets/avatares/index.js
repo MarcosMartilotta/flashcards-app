@@ -1,6 +1,5 @@
 const avatars = {
     avatar1: require('./avatar1.png'),
-    avatar2: require('./avatar2.jfif'),
     avatar3: require('./avatar3.png'),
     avatar4: require('./avatar4.png'),
     avatar5: require('./avatar5.jpeg'),
