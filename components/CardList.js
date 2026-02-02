@@ -12,7 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 
-export default function CardList({ cards, onEdit, onToggleLocal, theme }) {
+export default function CardList({ cards, onEdit, onToggleLocal, theme, currentUserId, currentUserRole }) {
 
     const handleExport = async () => {
         try {
@@ -64,6 +64,9 @@ export default function CardList({ cards, onEdit, onToggleLocal, theme }) {
                 <Text style={[styles.cellText, { color: theme.text }, item.is_active === 0 && { color: theme.textSecondary, opacity: 0.6 }]} numberOfLines={2}>
                     {item.respuesta}
                 </Text>
+                <Text style={[styles.claseLabel, { color: theme.primary }]}>
+                    {item.clase && item.clase !== '' ? `🏫 ${item.clase}` : '👤 Propia'}
+                </Text>
             </View>
 
             <View style={styles.actions}>
@@ -73,9 +76,12 @@ export default function CardList({ cards, onEdit, onToggleLocal, theme }) {
                     trackColor={{ false: "#94a3b8", true: theme.primary + '80' }}
                     thumbColor={item.is_active === 1 ? theme.primary : "#f1f5f9"}
                 />
-                <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(item)}>
-                    <Text style={styles.editIcon}>✏️</Text>
-                </TouchableOpacity>
+                {/* Edit Button (Propia or Teacher) */}
+                {(currentUserRole === 'teacher' || item.teacher_id === currentUserId) && (
+                    <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(item)}>
+                        <Text style={styles.editIcon}>✏️</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -142,8 +148,14 @@ const styles = StyleSheet.create({
         paddingRight: 10,
     },
     cellText: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: "600",
+    },
+    claseLabel: {
+        fontSize: 10,
+        fontWeight: "800",
+        marginTop: 4,
+        textTransform: 'uppercase',
     },
     actions: {
         flexDirection: "row",

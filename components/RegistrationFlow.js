@@ -19,6 +19,9 @@ import Animated, {
 import { register, login } from "../services/service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { lightTheme, darkTheme } from "../theme";
+import avatars from "../assets/avatares";
+import { Image } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 
 const { width, height } = Dimensions.get("window");
 
@@ -32,6 +35,7 @@ export default function RegistrationFlow({ onComplete, isDarkMode }) {
     const [selectedRole, setSelectedRole] = useState("student");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [selectedAvatar, setSelectedAvatar] = useState("avatar1");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -54,6 +58,8 @@ export default function RegistrationFlow({ onComplete, isDarkMode }) {
         } else if (step === 4) {
             if (password.length < 8) return setError("Mínimo 8 caracteres");
             if (password !== confirmPassword) return setError("Las contraseñas no coinciden");
+            goToStep(5);
+        } else if (step === 5) {
             executeRegister();
         }
     };
@@ -61,11 +67,11 @@ export default function RegistrationFlow({ onComplete, isDarkMode }) {
     async function executeRegister() {
         setLoading(true);
         try {
-            const result = await register(email, name, password, selectedRole, institucion);
+            const result = await register(email, name, password, selectedRole, institucion, selectedAvatar);
             await AsyncStorage.setItem("userToken", result.token);
             await AsyncStorage.setItem("userData", JSON.stringify(result.user));
             await AsyncStorage.setItem("userName", result.user.name);
-            goToStep(5);
+            goToStep(6);
             setTimeout(() => onComplete(), 1500);
         } catch (err) {
             setError(err.message);
@@ -194,6 +200,9 @@ export default function RegistrationFlow({ onComplete, isDarkMode }) {
                             <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.primary }]} onPress={handleNextRegister}>
                                 <Text style={styles.mainBtnText}>Continuar</Text>
                             </TouchableOpacity>
+                            <TouchableOpacity style={{ marginTop: 25 }} onPress={() => goToStep(2)}>
+                                <Text style={[styles.backBtn, { color: theme.textSecondary }]}>← Volver</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
@@ -207,10 +216,41 @@ export default function RegistrationFlow({ onComplete, isDarkMode }) {
                             <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.secondary }]} onPress={handleNextRegister} disabled={loading}>
                                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.mainBtnText}>Finalizar</Text>}
                             </TouchableOpacity>
+                            <TouchableOpacity style={{ marginTop: 25 }} onPress={() => goToStep(3)}>
+                                <Text style={[styles.backBtn, { color: theme.textSecondary }]}>← Volver</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Step 5: Success */}
+                    {/* Step 5: Register - Avatar */}
+                    <View style={styles.stepContainer}>
+                        <Text style={[styles.stepTitle, { color: theme.text }]}>Elige tu Avatar</Text>
+                        <ScrollView contentContainerStyle={styles.avatarGrid} showsVerticalScrollIndicator={false}>
+                            {Object.keys(avatars).map((key) => (
+                                <TouchableOpacity
+                                    key={key}
+                                    style={[
+                                        styles.avatarOption,
+                                        { borderColor: theme.glassBorder },
+                                        selectedAvatar === key && { borderColor: theme.primary, borderWidth: 3 }
+                                    ]}
+                                    onPress={() => setSelectedAvatar(key)}
+                                >
+                                    <Image source={avatars[key]} style={styles.avatarImg} />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <View style={styles.form}>
+                            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: theme.primary, marginTop: 20 }]} onPress={handleNextRegister} disabled={loading}>
+                                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.mainBtnText}>Finalizar Registro</Text>}
+                            </TouchableOpacity>
+                            <TouchableOpacity style={{ marginTop: 25 }} onPress={() => goToStep(4)}>
+                                <Text style={[styles.backBtn, { color: theme.textSecondary }]}>← Volver</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Step 6: Success */}
                     <View style={styles.stepContainer}>
                         <View style={[styles.successBadge, { backgroundColor: theme.secondary }]}>
                             <Text style={styles.check}>✓</Text>
@@ -260,8 +300,31 @@ const styles = StyleSheet.create({
     ghostBtnText: { fontSize: 18, fontWeight: "bold" },
     backBtn: { marginTop: 25, fontSize: 15, fontWeight: "600", textDecorationLine: "underline" },
     error: { color: "#ef4444", marginBottom: 20, fontWeight: "600", textAlign: "center" },
+    backArrow: { position: 'absolute', top: -50, left: 0, padding: 10, zIndex: 10 },
+    backArrowText: { fontSize: 28, fontWeight: 'bold' },
     successBadge: { width: 120, height: 120, borderRadius: 60, justifyContent: "center", alignItems: "center", marginBottom: 25, elevation: 10 },
     check: { color: "#fff", fontSize: 60, fontWeight: "bold" },
     successTitle: { fontSize: 30, fontWeight: "bold", marginBottom: 10 },
-    successSub: { fontSize: 18, textAlign: "center" }
+    successSub: { fontSize: 18, textAlign: "center" },
+    avatarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 15,
+        paddingBottom: 20,
+    },
+    avatarOption: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 2,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarImg: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    }
 });

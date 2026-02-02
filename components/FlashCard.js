@@ -14,7 +14,7 @@ import * as Speech from 'expo-speech';
 const SWIPE_THRESHOLD = 120;
 const { width, height } = Dimensions.get("window");
 
-export default function FlashCard({ card, onLongPress, onEdit, onArchive, onNext, theme }) {
+export default function FlashCard({ card, onLongPress, onEdit, onArchive, onNext, theme, currentUserId, currentUserRole }) {
     const [isFlipped, setIsFlipped] = useState(false);
     const [showAnswer, setShowAnswer] = useState(false);
     const rotation = useSharedValue(0);
@@ -192,12 +192,14 @@ export default function FlashCard({ card, onLongPress, onEdit, onArchive, onNext
                             </Animated.Text>
                         </TouchableOpacity>
 
-                        {/* Edit Button - Top Right */}
-                        <TouchableOpacity style={styles.editButton} onPress={onEdit}>
-                            <Animated.Text style={[styles.editButtonText, textAnimatedStyle]}>
-                                ✏️
-                            </Animated.Text>
-                        </TouchableOpacity>
+                        {/* Edit Button - Top Right (Propia or Teacher) */}
+                        {(currentUserRole === 'teacher' || card.teacher_id === currentUserId) && (
+                            <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+                                <Animated.Text style={[styles.editButtonText, textAnimatedStyle]}>
+                                    ✏️
+                                </Animated.Text>
+                            </TouchableOpacity>
+                        )}
                     </TouchableOpacity>
                 </Animated.View>
             </GestureDetector>

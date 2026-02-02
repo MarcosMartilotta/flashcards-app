@@ -18,12 +18,12 @@ async function getAuthHeaders() {
     }
 }
 
-export async function register(email, name, password, role, institucion) {
+export async function register(email, name, password, role, institucion, avatar) {
     try {
         const response = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, name, password, role, institucion }),
+            body: JSON.stringify({ email, name, password, role, institucion, avatar }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Error en el registro");
@@ -103,13 +103,30 @@ export async function bulkCreateCards(cards, selectedClase = null) {
     }
 }
 
-export async function updateCard(id, pregunta, respuesta) {
+export async function updateProfile(email, name, institucion, avatar) {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/auth/update-profile`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ email, name, institucion, avatar }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Error al actualizar perfil");
+        return data;
+    } catch (error) {
+        console.error("updateProfile error:", error);
+        throw error;
+    }
+}
+
+export async function updateCard(id, pregunta, respuesta, selectedClase = null) {
     try {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_URL}/cards/${id}`, {
             method: "PUT",
             headers,
-            body: JSON.stringify({ pregunta, respuesta }),
+            body: JSON.stringify({ pregunta, respuesta, selectedClase }),
         });
         if (!response.ok) {
             const errorData = await response.json();

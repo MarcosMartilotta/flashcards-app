@@ -9,6 +9,7 @@ import RegistrationFlow from "./components/RegistrationFlow";
 import Sidebar from "./components/Sidebar";
 import CardList from "./components/CardList";
 import ClassesView from "./components/ClassesView";
+import ProfileView from "./components/ProfileView";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { lightTheme, darkTheme } from "./theme";
 
@@ -26,7 +27,7 @@ export default function App() {
   const [teacherClasses, setTeacherClasses] = useState([]);
 
   // App State
-  const [view, setView] = useState("flashcards"); // "flashcards", "list", "classes"
+  const [view, setView] = useState("flashcards"); // "flashcards", "list", "classes", "profile"
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hasPendingChanges = useRef(false);
 
@@ -118,7 +119,7 @@ export default function App() {
 
   const handleSave = async (pregunta, respuesta, selectedClase = null) => {
     if (editMode && editingCard) {
-      await updateCard(editingCard.id, pregunta, respuesta);
+      await updateCard(editingCard.id, pregunta, respuesta, selectedClase);
     } else {
       await addCard(pregunta, respuesta, selectedClase);
     }
@@ -186,7 +187,7 @@ export default function App() {
 
   const activeCards = cards.filter(c => c.is_active === 1);
   const currentCard = cards[currentCardIndex];
-  const pageTitle = view === "flashcards" ? "Estudiar" : (view === "list" ? "Mis Tarjetas" : "Mis Clases");
+  const pageTitle = view === "flashcards" ? "Estudiar" : (view === "list" ? "Mis Tarjetas" : (view === "classes" ? "Mis Clases" : "Mi Perfil"));
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -225,6 +226,8 @@ export default function App() {
                     onArchive={() => handleArchiveToggle(currentCard.id, false)}
                     onNext={handleNextCard}
                     theme={theme}
+                    currentUserId={user?.id}
+                    currentUserRole={user?.role}
                   />
 
                   <View style={styles.actionRow}>
@@ -268,6 +271,8 @@ export default function App() {
               onEdit={(card) => openEditModal(card)}
               onToggleLocal={handleLocalToggle}
               theme={theme}
+              currentUserId={user?.id}
+              currentUserRole={user?.role}
             />
           )}
 
@@ -279,6 +284,15 @@ export default function App() {
                 const updatedClasses = await getTeacherClasses();
                 setTeacherClasses(updatedClasses);
               }}
+            />
+          )}
+
+          {view === "profile" && (
+            <ProfileView
+              user={user}
+              onBack={() => setView("flashcards")}
+              onUpdate={(updatedUser) => setUser(updatedUser)}
+              theme={theme}
             />
           )}
         </View>
@@ -301,7 +315,7 @@ export default function App() {
         isEditing={editMode}
         initialData={
           editMode && editingCard
-            ? { pregunta: editingCard.pregunta, respuesta: editingCard.respuesta }
+            ? { pregunta: editingCard.pregunta, respuesta: editingCard.respuesta, clase: editingCard.clase }
             : null
         }
         user={user}

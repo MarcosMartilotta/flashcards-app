@@ -11,6 +11,8 @@ import Animated, {
     useAnimatedStyle,
     withTiming,
 } from "react-native-reanimated";
+import avatars from "../assets/avatares";
+import { Image } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -47,9 +49,16 @@ export default function Sidebar({ isOpen, onClose, onLogout, onNavigate, onImpor
             </Animated.View>
 
             <Animated.View style={[styles.drawer, { backgroundColor: theme.card, borderColor: theme.glassBorder }, animatedStyle]}>
-                <View style={styles.header}>
+                <TouchableOpacity style={styles.header} onPress={() => { onNavigate("profile"); onClose(); }}>
                     <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.avatarText}>{user?.name?.charAt(0) || "U"}</Text>
+                        {user?.avatar ? (
+                            <Image source={avatars[user.avatar]} style={styles.avatarImg} />
+                        ) : (
+                            <Text style={styles.avatarText}>{user?.name?.charAt(0) || "U"}</Text>
+                        )}
+                        <View style={styles.editBadge}>
+                            <Text style={styles.editBadgeText}>✏️</Text>
+                        </View>
                     </View>
                     <Text style={[styles.userName, { color: theme.text }]}>{user?.name || "Usuario"}</Text>
                     <View style={[styles.roleLabel, { backgroundColor: theme.primary + '20' }]}>
@@ -62,7 +71,7 @@ export default function Sidebar({ isOpen, onClose, onLogout, onNavigate, onImpor
                             🏢 {user.institucion}
                         </Text>
                     )}
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.menu}>
                     <MenuItem
@@ -131,6 +140,28 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
     },
     avatarText: { fontSize: 42, color: "#fff", fontWeight: "900" },
+    avatarImg: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+    },
+    editBadgeText: { fontSize: 14 },
     userName: { fontSize: 24, fontWeight: "800", marginBottom: 8 },
     roleLabel: {
         paddingHorizontal: 15,

@@ -29,18 +29,19 @@ export default function CardModal({
         if (visible) {
             setPregunta(initialData?.pregunta || "");
             setRespuesta(initialData?.respuesta || "");
-            setSelectedClase(null);
+            setSelectedClase(initialData?.clase || null);
         }
     }, [visible, initialData]);
 
     const [isTranslatingP, setIsTranslatingP] = useState(false);
     const [isTranslatingR, setIsTranslatingR] = useState(false);
 
-    const handleTranslate = async (field) => {
-        const text = field === 'pregunta' ? pregunta : respuesta;
+    const handleTranslate = async (sourceField, targetField = null) => {
+        const text = sourceField === 'pregunta' ? pregunta : respuesta;
+        const finalTargetField = targetField || sourceField;
         if (!text.trim()) return;
 
-        if (field === 'pregunta') setIsTranslatingP(true);
+        if (sourceField === 'pregunta') setIsTranslatingP(true);
         else setIsTranslatingR(true);
 
         try {
@@ -55,7 +56,7 @@ export default function CardModal({
                 }
 
                 if (translations && translations.length === 1) {
-                    if (field === 'pregunta') setPregunta(translations[0].translatedText);
+                    if (finalTargetField === 'pregunta') setPregunta(translations[0].translatedText);
                     else setRespuesta(translations[0].translatedText);
                 }
             }
@@ -99,17 +100,27 @@ export default function CardModal({
                             onChangeText={setPregunta}
                             multiline
                         />
-                        <TouchableOpacity
-                            style={[styles.inlineTranslateBtn]}
-                            onPress={() => handleTranslate('pregunta')}
-                            disabled={isTranslatingP}
-                        >
-                            {isTranslatingP ? (
-                                <ActivityIndicator size="small" color={theme.primary} />
-                            ) : (
-                                <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir pregunta</Text>
-                            )}
-                        </TouchableOpacity>
+                        <View style={styles.translateRow}>
+                            <TouchableOpacity
+                                style={[styles.inlineTranslateBtn]}
+                                onPress={() => handleTranslate('pregunta', 'respuesta')}
+                                disabled={isTranslatingP}
+                            >
+                                <Text style={[styles.translateBtnText, { color: theme.primary }]}>📝 Traducir debajo</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.inlineTranslateBtn]}
+                                onPress={() => handleTranslate('pregunta', 'pregunta')}
+                                disabled={isTranslatingP}
+                            >
+                                {isTranslatingP ? (
+                                    <ActivityIndicator size="small" color={theme.primary} />
+                                ) : (
+                                    <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir aquí</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View style={styles.inputWrapper}>
@@ -121,20 +132,30 @@ export default function CardModal({
                             onChangeText={setRespuesta}
                             multiline
                         />
-                        <TouchableOpacity
-                            style={[styles.inlineTranslateBtn]}
-                            onPress={() => handleTranslate('respuesta')}
-                            disabled={isTranslatingR}
-                        >
-                            {isTranslatingR ? (
-                                <ActivityIndicator size="small" color={theme.primary} />
-                            ) : (
-                                <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir respuesta</Text>
-                            )}
-                        </TouchableOpacity>
+                        <View style={styles.translateRow}>
+                            <TouchableOpacity
+                                style={[styles.inlineTranslateBtn]}
+                                onPress={() => handleTranslate('respuesta', 'pregunta')}
+                                disabled={isTranslatingR}
+                            >
+                                <Text style={[styles.translateBtnText, { color: theme.primary }]}>📝 Traducir arriba</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.inlineTranslateBtn]}
+                                onPress={() => handleTranslate('respuesta', 'respuesta')}
+                                disabled={isTranslatingR}
+                            >
+                                {isTranslatingR ? (
+                                    <ActivityIndicator size="small" color={theme.primary} />
+                                ) : (
+                                    <Text style={[styles.translateBtnText, { color: theme.primary }]}>🌐 Traducir aquí</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
-                    {user?.role === 'teacher' && !isEditing && (
+                    {user?.role === 'teacher' && (
                         <View style={styles.classSection}>
                             <Text style={[styles.label, { color: theme.textSecondary }]}>Asignar a:</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.classScroll}>
@@ -215,12 +236,16 @@ const styles = StyleSheet.create({
     inputWrapper: {
         marginBottom: 20,
     },
-    inlineTranslateBtn: {
-        alignSelf: 'flex-end',
-        paddingVertical: 5,
-        paddingHorizontal: 10,
+    translateRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginTop: -10,
         marginBottom: 5,
+    },
+    inlineTranslateBtn: {
+        paddingVertical: 5,
+        paddingHorizontal: 10,
     },
     translateBtnText: {
         fontSize: 13,
